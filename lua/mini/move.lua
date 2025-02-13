@@ -154,6 +154,9 @@ MiniMove.config = {
   options = {
     -- Automatically reindent selection during linewise vertical move
     reindent_linewise = true,
+
+    -- Prevent over-shifting to the left when moving selection left
+    prevent_overshift_left = false,
   },
 }
 --minidoc_afterlines_end
@@ -206,6 +209,25 @@ MiniMove.move_selection = function(direction, opts)
 
   -- Allow undo of consecutive moves at once (direction doesn't matter)
   local cmd = H.make_cmd_normal(is_moving)
+
+  -- Stop the squish overshift left
+  -- Note (Dan): There is a weird quirk where the first/last line of a selection
+  --             are equal, just skip those updates
+  local first_line = vim.fn.line("'<")
+  local last_line = vim.fn.line("'>")
+
+  if first_line == last_line then
+    return
+  end
+
+  if opts.prevent_overshift_left and direction == 'left' then
+    for line = first_line, last_line do
+      -- If there is no space to the left, don't move
+      if vim.fn.indent(line) == 0 then
+        return
+      end
+    end
+  end
 
   -- Treat horizontal linewise movement specially
   if is_linewise and dir_type == 'hori' then
@@ -414,6 +436,7 @@ H.setup_config = function(config)
 
   H.check_type('options', config.options, 'table')
   H.check_type('options.reindent_linewise', config.options.reindent_linewise, 'boolean')
+  H.check_type('options.prevent_overshift_left', config.options.prevent_overshift_left, 'boolean')
 
   return config
 end
